@@ -43,8 +43,7 @@ int findK(int k, Node *head)
             printf("%d \n", slow->data);
             return 1;
         }
-        fast = tmp;
-        
+       fast = tmp; 
     }
     return 0;
 }
