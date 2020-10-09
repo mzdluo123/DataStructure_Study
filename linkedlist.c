@@ -129,7 +129,7 @@ int main(int argc, char const *argv[]) {
     printf("delete\n");
     delete(linkedList , 3);
     printLinkedList(linkedList);
-    printf("node at index 2 is %d\n",get(linkedList,2)->data);
+    printf("find at index 2 is %d\n",get(linkedList,2)->data);
     printf("reverse\n");
     reverse(linkedList);
     printLinkedList(linkedList);
