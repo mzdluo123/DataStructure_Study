@@ -1,31 +1,107 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct Tuple
+#define MAX_SIZE 1500 //表示稀疏矩阵的非零元素的最大个数
+#define MAX_ROW 1500  //表示稀疏矩阵的行数的最大个数
+typedef struct Triple
 {
-    int row;
-    int col;
-    int value;
-} Tuple;
-
-typedef struct Matrix
+    int i, j; //表示非零元素的行下表和列下标
+    int val;  //非零元素的值，此处以int类型为例
+} Triple;
+typedef struct RLSMatrix
 {
-    int row_num, col_num, cnt;
-    Tuple **data;
-} Matrix;
 
-Matrix *convertToMatrix(int **matrix ,int col , int row)
+    Triple data[MAX_SIZE];     //非零元三元组表
+    int rpos[MAX_ROW];         //每行第一个非零元素的位置
+    int row_num, col_num, cnt; //稀疏矩阵的行数、列数以及非零元素的个数
+} RLSMatrix;
+
+void MultRLSMatrix(RLSMatrix M, RLSMatrix N, RLSMatrix *rs)
+{
+    int arow, brow, p, q, ccol, ctemp[MAX_ROW + 1], t, tp;
+    if (M.col_num != N.row_num)
+    { //不能相乘
+        return;
+    }
+    if (0 == M.cnt * N.cnt)
+    { //有一个是零矩阵
+        return;
+    }
+
+    rs->row_num = M.row_num;
+    rs->col_num = N.col_num;
+    rs->cnt = 0;
+   
+    for (arow = 1; arow <= M.row_num; arow++)
+    {
+        for (ccol = 1; ccol <= rs->col_num; ccol++)
+        {
+            ctemp[ccol] = 0; //rs的当前行的各列元素清零
+        }
+        rs->rpos[arow] = rs->cnt + 1; //开始时从第一个存储位置开始存，后面是基于前面的
+        if (arow < M.row_num)
+        {
+            tp = M.rpos[arow + 1]; 
+        }
+        else
+        {
+            tp = M.cnt + 1;  
+        }
+        for (p = M.rpos[arow]; p < tp; p++)
+        {
+            brow = M.data[p].j;
+            
+            if (brow < N.row_num)
+            {
+                t = N.rpos[brow + 1 ];
+            }
+            else
+            {
+                t = N.cnt + 1;
+            }
+            for (q = N.rpos[brow]; q < t; q++)
+            {
+                ccol = N.data[q].j; 
+                ctemp[ccol] += M.data[p].val * N.data[q].val;
+            } 
+        }     
+    
+        for (ccol = 1; ccol <= rs->col_num; ccol++)
+        {
+            if (0 != ctemp[ccol])
+            {
+                if (++rs->cnt > MAX_SIZE)
+                { 
+                    return;
+                }
+                rs->data[rs->cnt].i = arow;
+                rs->data[rs->cnt].j = ccol;
+                rs->data[rs->cnt].val = ctemp[ccol];
+            }
+        }
+    } //for_arow
+}
+
+RLSMatrix *convertToMatrix(int **matrix, int col, int row)
 {
 
     int notZero = 0;
+    RLSMatrix *structMatrix = malloc(sizeof(RLSMatrix));
 
     for (int i = 0; i < col; i++)
     {
+        char flag = 0;
+        structMatrix->rpos[i] = col;
         for (int j = 0; j < row; j++)
         {
-            if (matrix[i][j] != 0)
+            if (*((int *)matrix + row * i + j))
             {
                 notZero++;
+                if (!flag)
+                {
+                    structMatrix->rpos[i] = j;
+                    flag = 1;
+                }
             }
         }
     }
@@ -34,93 +110,76 @@ Matrix *convertToMatrix(int **matrix ,int col , int row)
         return NULL;
     }
 
-    Matrix *structMatrix = malloc(sizeof(Matrix));
     structMatrix->col_num = col;
+
     structMatrix->row_num = row;
     structMatrix->cnt = notZero;
-    Tuple **t = malloc(sizeof(Tuple *) * notZero);
+
     int offset = 0;
-    structMatrix->data = t;
     for (int i = 0; i < col; i++)
     {
         for (int j = 0; j < row; j++)
         {
-            if (matrix[i][j] != 0)
+            if (*((int *)matrix + row * i + j))
             {
-                t[offset] = (Tuple *)malloc(sizeof(Tuple));
-                t[offset]->col = i;
-                t[offset]->row = j;
-                t[offset]->value = matrix[i][j];
+                structMatrix->data[offset].i = i;
+                structMatrix->data[offset].j = j;
+                structMatrix->data[offset].val = *((int *)matrix + row * i + j);
+
                 offset++;
             }
         }
     }
 
-
     return structMatrix;
 }
 
-Matrix* multiply(Matrix *a,Matrix *b){
-    if (a->col_num != b->row_num ) // 不能相乘
-    {
-        return NULL;
-    }
-     if(0 == a->cnt * b->cnt ){ //有一个是零矩阵
-        return;
-    }
-    
-    Matrix *ans = malloc(sizeof(Matrix));
-    ans->col_num = a->row_num;
-    ans->row_num = b->col_num;
-    for (int i = 0; i < a->cnt; i++)
-    {
-        /* code */
-    }
-    
-}
-
-void printMatrix(Matrix *m){
+void printMatrix(RLSMatrix *m)
+{
     printf("size: %d \n", m->cnt);
     printf("row %d \n", m->row_num);
     printf("col %d \n", m->col_num);
     for (int i = 0; i < m->cnt; i++)
     {
-       printf("%d %d %d \n", m->data[i]->col,m->data[i]->row,m->data[i]->value);
+        printf("%d %d %d \n", m->data[i].i,m->data[i].j,m->data[i].val);
     }
-    
 }
 
 int main(int argc, char const *argv[])
 {
-    int a[10][10] = 
-    {
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 5, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 7, 0}, 
-    {0, 0, 0, 0, 1, 0, 0, 0, 0, 0}, 
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 
-    {0, 0, 0, 9, 0, 0, 0, 0, 8, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-    };
+    int a[10][10] =
+        {
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 5, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 7, 0},
+            {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 9, 0, 0, 0, 0, 8, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
-     int b[10][10] = 
-    {
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 5, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 7, 0}, 
-    {0, 0, 0, 0, 1, 0, 0, 0, 0, 0}, 
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 
-    {0, 0, 0, 9, 0, 0, 0, 0, 8, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-    };
+    int b[10][10] =
+        {
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 5, 0, 0, 0, 0, 0, 0},
+            {0, 6, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 7, 0},
+            {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 9, 0, 0, 0, 0, 8, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
-    Matrix * m = convertToMatrix(&a,10,10);
+    RLSMatrix *m = convertToMatrix(&a, 10, 10);
     printMatrix(m);
+    RLSMatrix *n = convertToMatrix(&b, 10, 10);
+    printMatrix(n);
+    RLSMatrix *ans = malloc(sizeof(RLSMatrix));
+    MultRLSMatrix(*m, *n, ans);
+
+    printMatrix(ans);
     return 0;
 }
